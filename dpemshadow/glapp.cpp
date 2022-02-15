@@ -34,7 +34,7 @@ namespace glapp {
 		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
 		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 		glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-		m_pWindow = glfwCreateWindow(800, 600, "OpenGL", nullptr, nullptr);
+		m_pWindow = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "OpenGL", nullptr, nullptr);
 		glfwSetFramebufferSizeCallback(m_pWindow, FrameBufferSizeCallback);
 		glfwSetKeyCallback(m_pWindow, KeyCallback);
 		if (m_pWindow == nullptr)
@@ -71,7 +71,7 @@ namespace glapp {
 
 		m_LightShader.Init("shaders/light.vert", "shaders/light.frag", nullptr);
 
-		m_DpemShader.Init("shaders/dpemshadow.vert", "shaders/dpemshadow.frag", nullptr);
+		m_DpemShader.Init("shaders/dpemshadow.vert", nullptr, nullptr);
 	}
 
 	void GLApp::DrawFrame() {
@@ -82,8 +82,8 @@ namespace glapp {
 		m_DpemShader.SetVec3("lightPos", m_PointLight.pos);
 		m_DpemShader.SetFloat("near", m_PointLight.near);
 		m_DpemShader.SetFloat("far", m_PointLight.far);
-		RenderDepthMap(m_PointLight.frontMap, m_DpemShader, true);
-		RenderDepthMap(m_PointLight.backMap, m_DpemShader, false);
+		DrawRenderTexture(m_PointLight.frontMap, m_DpemShader, true);
+		DrawRenderTexture(m_PointLight.backMap, m_DpemShader, false);
 		glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
 		glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -114,6 +114,8 @@ namespace glapp {
 			DestroyCube(&cube);
 		}
 		m_CubeShader.Clear();
+		m_DpemShader.Clear();
+		m_LightShader.Clear();
 		glfwTerminate();
 	}
 
@@ -148,19 +150,20 @@ namespace glapp {
 	}
 
 
-	void GLApp::CreateDepthMap(globj::DepthMap* pMap) {
+	void GLApp::CreateRenderTexture(globj::RenderTexture* pTex) {
 		//创建纹理
-		glGenTextures(1, &pMap->texture);
-		glBindTexture(GL_TEXTURE_2D, pMap->texture);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, pMap->w, pMap->h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+		glGenTextures(1, &pTex->texture);
+		glBindTexture(GL_TEXTURE_2D, pTex->texture);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, pTex->w, pTex->h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		//绑定帧缓冲
-		glGenFramebuffers(1, &pMap->frameBuffer);
-		glBindFramebuffer(GL_FRAMEBUFFER, pMap->frameBuffer);
-		glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, pMap->texture, 0);
+		glGenFramebuffers(1, &pTex->frameBuffer);
+		glBindFramebuffer(GL_FRAMEBUFFER, pTex->frameBuffer);
+		glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, pTex->texture, 0);
+		glEnable(GL_DEPTH_TEST);
 		glDrawBuffer(GL_NONE);
 		glReadBuffer(GL_NONE);
 		//重置
@@ -168,9 +171,9 @@ namespace glapp {
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}
 
-	void GLApp::RenderDepthMap(globj::DepthMap& map, globj::Shader& shader, bool front) {
-		glViewport(0, 0, map.w, map.h);
-		glBindFramebuffer(GL_FRAMEBUFFER, map.frameBuffer);
+	void GLApp::DrawRenderTexture(globj::RenderTexture& tex, globj::Shader& shader, bool front) {
+		glViewport(0, 0, tex.w, tex.h);
+		glBindFramebuffer(GL_FRAMEBUFFER, tex.frameBuffer);
 		glClear(GL_DEPTH_BUFFER_BIT);
 		shader.Use();
 		shader.SetFloat("dir", front ? 1.0f : -1.0f); // 方向
@@ -180,6 +183,11 @@ namespace glapp {
 			glDrawArrays(GL_TRIANGLES, 0, cube.vertices.size());
 		}
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	}
+
+	void GLApp::DestroyRenderTexture(globj::RenderTexture* pTex) {
+		glDeleteFramebuffers(1, &pTex->frameBuffer);
+		glDeleteTextures(1, &pTex->texture);
 	}
 
 	void GLApp::CreatePointLight(globj::PointLight* pLight){
@@ -192,8 +200,8 @@ namespace glapp {
 		glEnableVertexAttribArray(0);
 		pLight->SetPos({ 0.0f, 10.0f, 0.0f });
 		pLight->color = { 0.71f, 0.7f, 0.6f };
-		CreateDepthMap(&pLight->frontMap);
-		CreateDepthMap(&pLight->backMap);
+		CreateRenderTexture(&pLight->frontMap);
+		CreateRenderTexture(&pLight->backMap);
 	}
 	void GLApp::RenderPointLight(globj::PointLight* pLight, globj::Shader* pShader) {
 		pShader->Use();
@@ -208,6 +216,8 @@ namespace glapp {
 	void GLApp::DestroyPointLight(globj::PointLight* pLight) {
 		glDeleteVertexArrays(1, &pLight->vertexArray);
 		glDeleteBuffers(1, &pLight->vertexBuffer);
+		DestroyRenderTexture(&pLight->frontMap);
+		DestroyRenderTexture(&pLight->backMap);
 	}
 
 	void GLApp::InitResources() {

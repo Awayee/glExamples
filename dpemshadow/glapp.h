@@ -33,8 +33,9 @@ namespace glapp {
 		void RenderPointLight(globj::PointLight* pLight, globj::Shader* pShader);
 		void DestroyPointLight(globj::PointLight* pLight);
 		// 阴影
-		void CreateDepthMap(globj::DepthMap* pMap);
-		void RenderDepthMap(globj::DepthMap& map, globj::Shader& shader, bool front=true);
+		void CreateRenderTexture(globj::RenderTexture* pTex);
+		void DrawRenderTexture(globj::RenderTexture& tex, globj::Shader& shader, bool front=true);
+		void DestroyRenderTexture(globj::RenderTexture* pTex);
 		// 立方体
 		void InitResources();
 		void CreateCube(globj::Cube* pCube);

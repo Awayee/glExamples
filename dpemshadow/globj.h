@@ -90,7 +90,7 @@ namespace globj {
 
 	};
 
-	struct DepthMap {
+	struct RenderTexture {
 		uint32_t w = 512, h = 512;
 		uint32_t frameBuffer;
 		uint32_t texture;
@@ -146,8 +146,8 @@ namespace globj {
 		float strength;
 		glm::mat4 transformMat;
 		//Ë«Å×ÃæÒõÓ°Ó³Éä
-		DepthMap frontMap;
-		DepthMap backMap;
+		RenderTexture frontMap;
+		RenderTexture backMap;
 		float fov = 1.576f, aspect = 1.0f, near = 0.1f, far = 100.0f;
 		void SetPos(glm::vec3 vPos) {
 			pos = vPos;
